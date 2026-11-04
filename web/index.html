@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Scraper</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1e222b; --border: #2a2f3a; --text: #e6e8ee;
+    --muted: #9aa3b2; --accent: #4f8cff; --accent-2: #3a74e0; --ok: #3ecf8e; --warn: #f5b74f; --err: #ff6b6b;
+    --radius: 10px; --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0; font-size: 18px; }
+  header span { color: var(--muted); }
+  .layout { display: grid; grid-template-columns: 360px 1fr; height: calc(100% - 55px); }
+  aside { border-right: 1px solid var(--border); overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .content { overflow-y: auto; padding: 22px 28px; }
+  h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=search] {
+    width: 100%; padding: 9px 10px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; font: inherit;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .field { margin-bottom: 14px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .row2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip input { display: none; }
+  .chip span {
+    display: inline-block; padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px;
+    cursor: pointer; user-select: none; background: var(--panel-2); color: var(--muted);
+  }
+  .chip input:checked + span { background: rgba(79,140,255,.15); border-color: var(--accent); color: var(--text); }
+  .linkbtn { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; font-size: 12px; }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; margin: 6px 0; cursor: pointer; }
+  details.adv > summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  button.primary, button.secondary, button.danger {
+    border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: #fff; width: 100%; padding: 11px; }
+  button.primary:hover { background: var(--accent-2); }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); }
+  button.danger { background: transparent; color: var(--err); border: 1px solid #5a2b2b; }
+  .runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .runs li { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--panel); }
+  .runs li:hover, .runs li.active { border-color: var(--accent); }
+  .runs .q { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .runs .m { color: var(--muted); font-size: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+  .status { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.running { background: rgba(79,140,255,.18); color: var(--accent); }
+  .pill.done { background: rgba(62,207,142,.15); color: var(--ok); }
+  .pill.error, .pill.cancelled { background: rgba(255,107,107,.15); color: var(--err); }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  pre.log {
+    margin: 0; max-height: 300px; overflow: auto; background: #0b0d11; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; font: 12px/1.55 var(--mono); color: #c9d1e0; white-space: pre-wrap; word-break: break-all;
+  }
+  .log .w { color: var(--warn); } .log .e { color: var(--err); } .log .ok { color: var(--ok); }
+  .res-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .res-head h2 { margin: 0 0 4px; font-size: 20px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stats { display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+  .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .tab { background: none; border: 0; color: var(--muted); padding: 9px 14px; cursor: pointer; font: inherit; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .page { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 10px; }
+  .page .t { font-weight: 600; font-size: 15px; }
+  .page .u { font-size: 12px; word-break: break-all; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+  .badge.eng { color: var(--accent); border-color: rgba(79,140,255,.4); }
+  .page details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .page pre.text {
+    white-space: pre-wrap; word-wrap: break-word; background: #0b0d11; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; max-height: 520px; overflow: auto; font: 13px/1.6 system-ui, sans-serif; color: #d5dae3; margin: 8px 0 0;
+  }
+  .page .ptools { display: flex; gap: 8px; margin-top: 8px; }
+  .serp h4 { margin: 14px 0 6px; text-transform: capitalize; }
+  .serp ol { margin: 0; padding-left: 22px; }
+  .serp li { margin-bottom: 8px; }
+  .serp .s { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); max-width: 640px; }
+  .empty h2 { color: var(--text); }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel-2); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; height: auto; } aside { border-right: 0; border-bottom: 1px solid var(--border); } }
+</style>
+</head>
+<body>
+<header><h1>Web Scraper</h1><span>search → read top results → follow links → raw text for summarising</span></header>
+
+<div class="layout">
+  <aside>
+    <form id="form" autocomplete="off">
+      <h3>New search</h3>
+      <div class="field">
+        <label for="query">Query</label>
+        <input type="text" id="query" placeholder="e.g. how do solid state batteries work" required autofocus>
+      </div>
+      <div class="field">
+        <label style="display:flex;justify-content:space-between">Search engines
+          <span><button type="button" class="linkbtn" id="allEngines">all</button> · <button type="button" class="linkbtn" id="noEngines">none</button></span>
+        </label>
+        <div class="chips" id="engines"></div>
+      </div>
+      <div class="row3 field">
+        <div><label for="top">Top results / engine</label><input type="number" id="top" min="1" max="50" value="5"></div>
+        <div><label for="depth">Link depth</label><input type="number" id="depth" min="0" max="3" value="1"></div>
+        <div><label for="links">Links / page</label><input type="number" id="links" min="0" max="20" value="3"></div>
+      </div>
+      <div class="hint" style="margin:-6px 0 12px">Depth 0 = read only the search results. Depth 1 = also read the best links inside each result.</div>
+
+      <details class="adv">
+        <summary>Advanced options</summary>
+        <label class="check"><input type="checkbox" id="any_domain"> Follow links to other websites</label>
+        <label class="check"><input type="checkbox" id="browser"> Render every page in the browser (slower)</label>
+        <label class="check"><input type="checkbox" id="show_browser"> Show browser window (solve CAPTCHAs)</label>
+        <label class="check"><input type="checkbox" id="js_fallback" checked> Retry blocked / empty pages in the browser</label>
+        <label class="check"><input type="checkbox" id="respect_robots" checked> Respect robots.txt</label>
+        <div class="row2" style="margin-top:10px">
+          <div class="field"><label for="max_pages">Max pages total</label><input type="number" id="max_pages" min="1" max="500" value="100"></div>
+          <div class="field"><label for="max_chars">Max chars / page (0 = all)</label><input type="number" id="max_chars" min="0" value="0"></div>
+          <div class="field"><label for="concurrency">Parallel downloads</label><input type="number" id="concurrency" min="1" max="20" value="6"></div>
+          <div class="field"><label for="timeout">Timeout (seconds)</label><input type="number" id="timeout" min="5" max="120" value="20"></div>
+        </div>
+      </details>
+
+      <button type="submit" class="primary" id="startBtn">Start scraping</button>
+    </form>
+
+    <section>
+      <h3>Past runs</h3>
+      <ul class="runs" id="runs"><li class="m" style="cursor:default">Loading…</li></ul>
+    </section>
+  </aside>
+
+  <section class="content">
+    <div id="emptyState" class="empty">
+      <h2>Search many engines at once and collect the raw text</h2>
+      <p>Type a query, pick the search engines and how many top results to read from each. The scraper opens every result,
+        extracts the main text, follows the most relevant links inside those pages, and gives you everything as one
+        Markdown file you can copy into a summariser.</p>
+      <p>Previous runs are listed on the left.</p>
+    </div>
+
+    <div id="progress" class="card" hidden>
+      <div class="status">
+        <div class="spinner" id="spinner"></div>
+        <span class="pill running" id="statusPill">running</span>
+        <strong id="progressQuery"></strong>
+        <span class="meta" id="progressMeta"></span>
+        <span style="flex:1"></span>
+        <button class="danger" id="stopBtn">Stop</button>
+      </div>
+      <pre class="log" id="log"></pre>
+    </div>
+
+    <div id="results" hidden>
+      <div class="res-head">
+        <div>
+          <h2 id="resQuery"></h2>
+          <div class="meta" id="resMeta"></div>
+        </div>
+        <div class="actions">
+          <button class="secondary" id="copyAll">Copy all text</button>
+          <button class="secondary" id="dlMd">Download .md</button>
+          <button class="secondary" id="dlJson">Download .json</button>
+          <button class="danger" id="delRun">Delete</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="tabs">
+        <button class="tab active" data-tab="pages">Pages</button>
+        <button class="tab" data-tab="serp">Search results</button>
+        <button class="tab" data-tab="failed">Not read</button>
+      </div>
+      <div data-panel="pages">
+        <input type="search" id="filter" placeholder="Filter pages by title, URL or text…" style="margin-bottom:12px">
+        <div id="pages"></div>
+      </div>
+      <div data-panel="serp" class="serp" hidden></div>
+      <div data-panel="failed" hidden></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "#");
+const fmt = (n) => Number(n || 0).toLocaleString();
+const FIELDS = ["top", "depth", "links", "max_pages", "max_chars", "concurrency", "timeout"];
+const CHECKS = ["any_domain", "browser", "show_browser", "js_fallback", "respect_robots"];
+const SETTINGS_KEY = "scraper-settings";
+
+let job = null, logCount = 0, pollTimer = null, currentRun = null, currentRunId = null;
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = await res.json(); msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch {}
+    throw new Error(msg);
+  }
+  return res;
+}
+
+/* ---------- form ---------- */
+async function initForm() {
+  const { engines, default: defaults } = await (await api("/api/engines")).json();
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+  const picked = saved.engines || defaults;
+  $("#engines").innerHTML = engines.map((e) =>
+    `<label class="chip"><input type="checkbox" value="${esc(e)}" ${picked.includes(e) ? "checked" : ""}><span>${esc(e)}</span></label>`).join("");
+  FIELDS.forEach((f) => { if (saved[f] !== undefined) $("#" + f).value = saved[f]; });
+  CHECKS.forEach((f) => { if (saved[f] !== undefined) $("#" + f).checked = saved[f]; });
+  $("#allEngines").onclick = () => $("#engines").querySelectorAll("input").forEach((i) => (i.checked = true));
+  $("#noEngines").onclick = () => $("#engines").querySelectorAll("input").forEach((i) => (i.checked = false));
+}
+
+function readForm() {
+  const body = {
+    query: $("#query").value.trim(),
+    engines: [...$("#engines").querySelectorAll("input:checked")].map((i) => i.value),
+  };
+  FIELDS.forEach((f) => (body[f] = Number($("#" + f).value)));
+  CHECKS.forEach((f) => (body[f] = $("#" + f).checked));
+  return body;
+}
+
+$("#form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const body = readForm();
+  if (!body.query) return toast("Enter a query");
+  if (!body.engines.length) return toast("Pick at least one search engine");
+  const { query, ...settings } = body;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  try {
+    const { job_id } = await (await api("/api/scrape", { method: "POST", body: JSON.stringify(body) })).json();
+    startPolling({ id: job_id, query: body.query, status: "running" }, true);
+  } catch (e) { toast(e.message); }
+});
+
+/* ---------- job progress ---------- */
+function startPolling(j, fresh) {
+  job = j; logCount = 0;
+  $("#log").innerHTML = "";
+  $("#progressQuery").textContent = j.query;
+  $("#progress").hidden = false;
+  $("#emptyState").hidden = true;
+  if (fresh) $("#results").hidden = true;
+  setStatus("running");
+  clearInterval(pollTimer);
+  pollTimer = setInterval(poll, 700);
+  poll();
+}
+
+function setStatus(status) {
+  const pill = $("#statusPill");
+  pill.className = "pill " + status; pill.textContent = status;
+  const running = status === "running";
+  $("#spinner").hidden = !running; $("#stopBtn").hidden = !running;
+  $("#startBtn").disabled = running;
+  $("#startBtn").textContent = running ? "Scraping…" : "Start scraping";
+}
+
+function logLine(line) {
+  const cls = /warn|blocked|unrelated|no results|failed|rate-limit/i.test(line) ? "w"
+    : /^error|FAILED/i.test(line) ? "e" : /^Done in/.test(line) ? "ok" : "";
+  return `<span class="${cls}">${esc(line)}</span>\n`;
+}
+
+async function poll() {
+  if (!job) return;
+  let s;
+  try { s = await (await api(`/api/jobs/${job.id}?since=${logCount}`)).json(); }
+  catch { return; }
+  if (s.logs.length) {
+    const box = $("#log");
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.insertAdjacentHTML("beforeend", s.logs.map(logLine).join(""));
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+  logCount = s.log_count;
+  const pagesDone = ($("#log").textContent.match(/^\s+\[d\d+ #\d+\]/gm) || []).length;
+  $("#progressMeta").textContent = `${Math.round(s.elapsed)}s · ${pagesDone} page(s) processed`;
+  if (s.status !== "running") {
+    clearInterval(pollTimer); pollTimer = null;
+    setStatus(s.status);
+    if (s.status === "done" && s.run_id) { await loadRuns(); await loadRun(s.run_id); }
+    else if (s.status === "error") toast(s.error || "Scrape failed");
+  }
+}
+
+$("#stopBtn").onclick = async () => {
+  if (job) { try { await api(`/api/jobs/${job.id}/cancel`, { method: "POST" }); } catch (e) { toast(e.message); } }
+};
+
+/* ---------- runs ---------- */
+async function loadRuns() {
+  const { runs } = await (await api("/api/runs")).json();
+  const ul = $("#runs");
+  if (!runs.length) { ul.innerHTML = `<li class="m" style="cursor:default">No runs yet.</li>`; return; }
+  ul.innerHTML = runs.map((r) => {
+    const when = r.generated_at ? new Date(r.generated_at).toLocaleString() : "";
+    const st = r.stats || {};
+    return `<li data-id="${esc(r.id)}" class="${r.id === currentRunId ? "active" : ""}">
+      <div class="q" title="${esc(r.query)}">${esc(r.query)}</div>
+      <div class="m">${esc(when)} · ${fmt(st.pages_ok)} pages · ${fmt(st.total_chars)} chars</div></li>`;
+  }).join("");
+  ul.querySelectorAll("li[data-id]").forEach((li) => (li.onclick = () => loadRun(li.dataset.id)));
+}
+
+async function loadRun(id) {
+  try { currentRun = await (await api(`/api/runs/${encodeURIComponent(id)}`)).json(); }
+  catch (e) { return toast(e.message); }
+  currentRunId = id;
+  document.querySelectorAll("#runs li").forEach((li) => li.classList.toggle("active", li.dataset.id === id));
+  if (!pollTimer) $("#progress").hidden = job ? false : true;
+  $("#emptyState").hidden = true;
+  renderRun(currentRun);
+}
+
+function renderRun(d) {
+  const st = d.stats || {}, s = d.settings || {};
+  $("#results").hidden = false;
+  $("#resQuery").textContent = d.query;
+  $("#resMeta").textContent = `${new Date(d.generated_at).toLocaleString()} · engines: ${(s.engines || []).join(", ")} · `
+    + `top ${s.top} per engine · depth ${s.depth} · ${s.links_per_page} links/page${s.same_domain === false ? " · any domain" : ""}`;
+  const serpCount = Object.values(d.search_results || {}).reduce((a, r) => a + r.length, 0);
+  $("#stats").innerHTML = [
+    [fmt(st.pages_ok), "pages with text"], [fmt(st.total_chars), "characters"], [fmt(serpCount), "search results"],
+    [fmt(st.pages_duplicate), "duplicates skipped"], [fmt(st.pages_failed), "not read"],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+
+  const ok = d.pages.filter((p) => p.text);
+  const failed = d.pages.filter((p) => !p.text);
+  document.querySelector('[data-tab="pages"]').textContent = `Pages (${ok.length})`;
+  document.querySelector('[data-tab="serp"]').textContent = `Search results (${serpCount})`;
+  document.querySelector('[data-tab="failed"]').textContent = `Not read (${failed.length})`;
+  $("#filter").value = "";
+  renderPages(ok);
+  renderSerp(d.search_results || {});
+  renderFailed(failed);
+  showTab("pages");
+}
+
+function pageSource(p, byId) {
+  if (p.found_via && p.found_via.length)
+    return p.found_via.map((v) => `<span class="badge eng">${esc(v.engine)} #${esc(v.rank)}</span>`).join("");
+  const parent = byId[p.parent_id];
+  return `<span class="badge" title="${esc(p.link_anchor)}">linked from [${esc(p.parent_id)}] ${esc((parent && parent.title) || p.parent_url || "").slice(0, 60)}</span>`;
+}
+
+function renderPages(pages) {
+  const byId = Object.fromEntries(currentRun.pages.map((p) => [p.id, p]));
+  $("#pages").innerHTML = pages.length ? pages.map((p) => `
+    <div class="page" data-id="${p.id}">
+      <div class="t">[${p.id}] ${esc(p.title || p.final_url || p.url)}</div>
+      <a class="u" href="${esc(safeUrl(p.final_url || p.url))}" target="_blank" rel="noopener noreferrer">${esc(p.final_url || p.url)}</a>
+      <div class="badges">
+        ${pageSource(p, byId)}
+        <span class="badge">depth ${p.depth}</span>
+        <span class="badge">${fmt(p.chars)} chars</span>
+        ${p.published ? `<span class="badge">${esc(p.published)}</span>` : ""}
+        ${p.author ? `<span class="badge">${esc(p.author)}</span>` : ""}
+        ${p.fetched_with === "browser" ? `<span class="badge">via browser</span>` : ""}
+      </div>
+      <details><summary>Show text</summary><pre class="text"></pre>
+        <div class="ptools"><button class="secondary copy-page">Copy this page</button></div>
+      </details>
+    </div>`).join("") : `<p class="meta">No pages match.</p>`;
+  $("#pages").querySelectorAll(".page").forEach((el) => {
+    const p = byId[el.dataset.id];
+    const det = el.querySelector("details");
+    det.addEventListener("toggle", () => { const pre = det.querySelector("pre"); if (det.open && !pre.textContent) pre.textContent = p.text; });
+    el.querySelector(".copy-page").onclick = () => copyText(`# ${p.title}\nURL: ${p.final_url || p.url}\n\n${p.text}`);
+  });
+}
+
+function renderSerp(serp) {
+  const panel = document.querySelector('[data-panel="serp"]');
+  panel.innerHTML = Object.entries(serp).map(([eng, rs]) => `
+    <h4>${esc(eng)} <span class="meta">(${rs.length})</span></h4>
+    ${rs.length ? `<ol>${rs.map((r) => `<li><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(r.title || r.url)}</a>
+      <div class="s">${esc(r.snippet)}</div></li>`).join("")}</ol>`
+      : `<p class="meta">No results (engine blocked the request or returned unrelated results).</p>`}`).join("");
+}
+
+function renderFailed(failed) {
+  const panel = document.querySelector('[data-panel="failed"]');
+  panel.innerHTML = failed.length ? failed.map((p) => `
+    <div class="page"><a class="u" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${esc(p.url)}</a>
+    <div class="meta">${p.duplicate_of ? `duplicate of [${esc(p.duplicate_of)}]` : esc(p.error || "no text extracted")}</div></div>`).join("")
+    : `<p class="meta">Every page was read.</p>`;
+}
+
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
+}
+document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => showTab(t.dataset.tab)));
+
+$("#filter").addEventListener("input", (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  const ok = currentRun.pages.filter((p) => p.text);
+  renderPages(q ? ok.filter((p) => `${p.title} ${p.url} ${p.text}`.toLowerCase().includes(q)) : ok);
+});
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast(`Copied ${fmt(text.length)} characters`); }
+  catch { toast("Copy failed – use Download instead"); }
+}
+
+$("#copyAll").onclick = async () => {
+  const res = await api(`/api/runs/${encodeURIComponent(currentRunId)}/files/raw_data.md`);
+  copyText(await res.text());
+};
+$("#dlMd").onclick = () => (location.href = `/api/runs/${encodeURIComponent(currentRunId)}/files/raw_data.md?download=true`);
+$("#dlJson").onclick = () => (location.href = `/api/runs/${encodeURIComponent(currentRunId)}/files/data.json?download=true`);
+$("#delRun").onclick = async () => {
+  if (!confirm(`Delete the run "${currentRun.query}"?`)) return;
+  try {
+    await api(`/api/runs/${encodeURIComponent(currentRunId)}`, { method: "DELETE" });
+    currentRun = currentRunId = null;
+    $("#results").hidden = true;
+    if ($("#progress").hidden) $("#emptyState").hidden = false;
+    await loadRuns();
+    toast("Run deleted");
+  } catch (e) { toast(e.message); }
+};
+
+/* ---------- boot ---------- */
+(async () => {
+  await initForm();
+  await loadRuns();
+  const { job: cur } = await (await api("/api/jobs/current")).json();
+  if (cur && cur.status === "running") startPolling(cur, true);
+})();
+</script>
+</body>
+</html>
