@@ -19,6 +19,19 @@ JavaScript-heavy or bot-protected pages.
 
 ## Usage
 
+### Web app
+
+```bash
+python app.py                 # opens http://127.0.0.1:8000 in your browser
+python app.py --port 9000 --no-open
+```
+
+Same options as the CLI in a form, a live progress log with a Stop button, and a results viewer:
+pages with their full text (filterable), the per-engine search results, pages that couldn't be read,
+"Copy all text" / download `.md` / `.json` buttons, and a history of past runs.
+
+### Command line
+
 Interactive (asks for query, engines, how many results, link depth):
 
 ```bash
